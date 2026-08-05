@@ -1,0 +1,264 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.microsoft.com/agency/azure-dev-vm/v1.json",
+  "title": "Agency Azure development VM configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "azure",
+    "vm",
+    "network",
+    "access",
+    "toolchain",
+    "autoShutdown"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "azure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tenantId",
+        "subscriptionId",
+        "resourceGroupName",
+        "createResourceGroup",
+        "location",
+        "tags"
+      ],
+      "properties": {
+        "tenantId": {
+          "$ref": "#/$defs/guid"
+        },
+        "subscriptionId": {
+          "$ref": "#/$defs/guid"
+        },
+        "resourceGroupName": {
+          "$ref": "#/$defs/resourceName"
+        },
+        "createResourceGroup": {
+          "type": "boolean"
+        },
+        "location": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+$",
+          "minLength": 2,
+          "maxLength": 32
+        },
+        "tags": {
+          "type": "object",
+          "maxProperties": 20,
+          "propertyNames": {
+            "pattern": "^[A-Za-z0-9_. -]{1,64}$"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 256
+          }
+        }
+      }
+    },
+    "vm": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "size",
+        "image",
+        "adminUsername",
+        "osDiskSizeGb"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9-]{0,13}[A-Za-z0-9]$",
+          "minLength": 2,
+          "maxLength": 15
+        },
+        "size": {
+          "type": "string",
+          "pattern": "^Standard_[A-Za-z0-9_]+$",
+          "maxLength": 64
+        },
+        "image": {
+          "enum": [
+            "MicrosoftWindowsDesktop:windows-11:win11-24h2-ent:latest",
+            "MicrosoftWindowsServer:WindowsServer:2022-datacenter-azure-edition:latest",
+            "MicrosoftWindowsServer:WindowsServer:2025-datacenter-azure-edition:latest"
+          ]
+        },
+        "adminUsername": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9._-]{0,18}[A-Za-z0-9]$",
+          "minLength": 2,
+          "maxLength": 20
+        },
+        "osDiskSizeGb": {
+          "type": "integer",
+          "minimum": 128,
+          "maximum": 4095,
+          "default": 256
+        }
+      }
+    },
+    "network": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "vnetResourceGroupName",
+        "vnetName",
+        "subnetName"
+      ],
+      "properties": {
+        "vnetResourceGroupName": {
+          "$ref": "#/$defs/resourceName"
+        },
+        "vnetName": {
+          "$ref": "#/$defs/resourceName"
+        },
+        "subnetName": {
+          "$ref": "#/$defs/resourceName"
+        }
+      }
+    },
+    "access": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 20,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "principalObjectId",
+          "principalType",
+          "role"
+        ],
+        "properties": {
+          "principalObjectId": {
+            "$ref": "#/$defs/guid"
+          },
+          "principalType": {
+            "enum": [
+              "User",
+              "Group"
+            ]
+          },
+          "role": {
+            "enum": [
+              "Virtual Machine Administrator Login",
+              "Virtual Machine User Login"
+            ]
+          }
+        }
+      }
+    },
+    "toolchain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sdkPackages",
+        "visualStudio"
+      ],
+      "properties": {
+        "sdkPackages": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 12,
+          "items": {
+            "enum": [
+              "Microsoft.DotNet.SDK.8",
+              "Microsoft.DotNet.SDK.9",
+              "Microsoft.DotNet.SDK.10"
+            ]
+          }
+        },
+        "visualStudio": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "edition",
+            "workloads",
+            "components",
+            "includeRecommended"
+          ],
+          "properties": {
+            "edition": {
+              "enum": [
+                "Enterprise",
+                "Professional",
+                "Community"
+              ]
+            },
+            "workloads": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "Microsoft.VisualStudio.Workload.ManagedDesktop",
+                  "Microsoft.VisualStudio.Workload.NetWeb",
+                  "Microsoft.VisualStudio.Workload.Azure",
+                  "Microsoft.VisualStudio.Workload.NativeDesktop",
+                  "Microsoft.VisualStudio.Workload.Universal",
+                  "Microsoft.VisualStudio.Workload.Data"
+                ]
+              }
+            },
+            "components": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "Microsoft.VisualStudio.Component.Git",
+                  "Microsoft.VisualStudio.Component.VC.Tools.x86.x64",
+                  "Microsoft.VisualStudio.Component.Windows11SDK.26100",
+                  "Microsoft.VisualStudio.ComponentGroup.Azure.Prerequisites"
+                ]
+              }
+            },
+            "includeRecommended": {
+              "type": "boolean",
+              "default": true
+            }
+          }
+        }
+      }
+    },
+    "autoShutdown": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "time",
+        "timeZone"
+      ],
+      "properties": {
+        "time": {
+          "type": "string",
+          "pattern": "^([01][0-9]|2[0-3])[0-5][0-9]$"
+        },
+        "timeZone": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9 _./+-]{1,63}$"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "guid": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+    },
+    "resourceName": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._()-]{0,88}[A-Za-z0-9_]$",
+      "minLength": 2,
+      "maxLength": 90
+    }
+  }
+}

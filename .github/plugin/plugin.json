@@ -1,0 +1,18 @@
+{
+  "name": "azure-dev-vm",
+  "description": "Safely plans and provisions private Azure Windows development VMs with Microsoft Entra sign-in and approved developer tools.",
+  "version": "1.0.0",
+  "author": {
+    "name": "JDamascenoMS"
+  },
+  "keywords": [
+    "agency",
+    "azure",
+    "development-vm",
+    "entra",
+    "visual-studio"
+  ],
+  "agents": [
+    "agents/azure-dev-vm.md"
+  ]
+}

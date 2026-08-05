@@ -1,0 +1,18 @@
+{
+  "name": "azure-dev-vm-marketplace",
+  "owner": {
+    "name": "JDamascenoMS"
+  },
+  "metadata": {
+    "description": "Agency agents for approved Azure development environments.",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "azure-dev-vm",
+      "source": "./",
+      "description": "Safely provisions private Azure Windows development VMs with Microsoft Entra sign-in and approved developer tools.",
+      "version": "1.0.0"
+    }
+  ]
+}

@@ -67,8 +67,16 @@ For a local plugin, the namespace is the checkout directory name (`agent-devtest
 This repository includes:
 
 - `.github/plugin/plugin.json`, the Copilot plugin manifest.
+- `.claude-plugin/plugin.json`, the Claude plugin manifest. Copilot accepts any one of the manifests, but the Claude engine requires this specific file, and both `agency plugin install` and `agency marketplace add` target every engine unless `--engine` is passed.
 - `.claude-plugin/marketplace.json`, a catalog contributing the plugin.
 - `agents/azure-dev-vm.md`, the plugin agent definition. It is intentionally kept identical to the repository-agent definition under `.github/agents`.
+
+Agency acquires GitHub-hosted plugins through the GitHub CLI, not through Git's credential helper. Install and authenticate `gh` first, otherwise installation fails with `No GitHub accounts found`:
+
+```powershell
+winget install --id GitHub.cli
+gh auth login --web --hostname github.com --git-protocol ssh --skip-ssh-key --clipboard
+```
 
 After pushing the repository to an approved GitHub organization, test direct installation:
 

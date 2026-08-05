@@ -53,6 +53,28 @@ Describe 'Agency plugin package' {
         Test-Path -LiteralPath (Join-Path $root $manifest.agents[0]) | Should Be $true
     }
 
+    It 'declares the Claude agent in the Claude plugin manifest' {
+        $manifestPath = Join-Path $root '.claude-plugin\plugin.json'
+        Test-Path -LiteralPath $manifestPath | Should Be $true
+        $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+        $manifest.name | Should Be 'azure-dev-vm'
+        Test-Path -LiteralPath (Join-Path $root $manifest.agents[0]) | Should Be $true
+    }
+
+    It 'points both engine manifests at the same agent definition' {
+        $copilotManifest = Get-Content -LiteralPath (
+            Join-Path $root '.github\plugin\plugin.json'
+        ) -Raw | ConvertFrom-Json
+        $claudeManifest = Get-Content -LiteralPath (
+            Join-Path $root '.claude-plugin\plugin.json'
+        ) -Raw | ConvertFrom-Json
+        $claudeManifest.name | Should Be $copilotManifest.name
+        $claudeManifest.version | Should Be $copilotManifest.version
+        $claudeAgent = (Resolve-Path -LiteralPath (Join-Path $root $claudeManifest.agents[0])).Path
+        $copilotAgent = (Resolve-Path -LiteralPath (Join-Path $root $copilotManifest.agents[0])).Path
+        $claudeAgent | Should Be $copilotAgent
+    }
+
     It 'contributes the plugin through the marketplace catalog' {
         $catalog = Get-Content -LiteralPath (
             Join-Path $root '.claude-plugin\marketplace.json'

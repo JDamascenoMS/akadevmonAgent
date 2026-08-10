@@ -11,7 +11,8 @@ It can run directly as a repository agent or be installed as an Agency/Copilot p
 - Planning performs Azure preflight checks but changes nothing.
 - Apply requires the SHA-256 hash of the exact reviewed command plan.
 - The hash also covers the VM-side installation script, so changing it invalidates approval.
-- A strong local bootstrap password is generated only in memory for Azure VM creation. It is not read from configuration or printed. The local bootstrap account is disabled after toolchain installation succeeds.
+- A strong local bootstrap password is generated only in memory for Azure VM creation. It is not read from configuration or printed. It is never passed on the Azure CLI command line, where other local processes could read it; instead it is written to a temporary file that only the invoking user can read, passed with Azure CLI `@file` syntax, then overwritten and deleted. The local bootstrap account is disabled after toolchain installation succeeds.
+- The VM-side installer verifies that `dotnet-install.ps1` and the Visual Studio bootstrapper carry a valid Authenticode signature from Microsoft Corporation before executing them, so a compromised endpoint or proxy cannot turn a download into SYSTEM-level code execution.
 - Toolchain setup uses managed Run Command with a four-hour timeout to accommodate Visual Studio workloads.
 - Provisioning stops on the first failure and reports partial state. It never silently deletes resources.
 

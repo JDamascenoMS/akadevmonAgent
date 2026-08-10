@@ -2,6 +2,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $script:SecretPlaceholder = '__AGENCY_VM_BOOTSTRAP_PASSWORD__'
+$script:RuntimeSecret = $null
 $script:ReservedAdminNames = @(
     'administrator', 'admin', 'user', 'user1', 'test', 'user2', 'test1',
     'user3', 'admin1', '123', 'a', 'actuser', 'adm', 'admin2', 'aspnet',
@@ -50,7 +51,7 @@ function ConvertTo-DisplayArgument {
     param([Parameter(Mandatory)][AllowEmptyString()][string] $Value)
 
     if ($Value -eq $script:SecretPlaceholder) {
-        return '$env:AGENCY_VM_BOOTSTRAP_PASSWORD'
+        return '@<runtime-secret-file>'
     }
     if ($Value.Length -eq 0) {
         return '""'
@@ -251,7 +252,7 @@ function Invoke-AzCommand {
         if ($AllowNotFound -and $exitCode -eq 3) {
             return $null
         }
-        $secret = $env:AGENCY_VM_BOOTSTRAP_PASSWORD
+        $secret = $script:RuntimeSecret
         $safeArguments = $Arguments | ForEach-Object {
             if ($secret -and $_ -eq $secret) { '[REDACTED]' } else { $_ }
         }
@@ -443,6 +444,41 @@ function New-RuntimePassword {
     return "A9!$base"
 }
 
+function New-RuntimeSecretFile {
+    param([Parameter(Mandatory)][string] $Secret)
+
+    $directory = Join-Path ([System.IO.Path]::GetTempPath()) ('agency-vm-' + [Guid]::NewGuid().ToString('n'))
+    New-Item -ItemType Directory -Path $directory | Out-Null
+
+    $acl = Get-Acl -LiteralPath $directory
+    $acl.SetAccessRuleProtection($true, $false)
+    $currentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().User
+    $acl.AddAccessRule((New-Object System.Security.AccessControl.FileSystemAccessRule(
+        $currentUser, 'FullControl', 'ContainerInherit, ObjectInherit', 'None', 'Allow'
+    )))
+    Set-Acl -LiteralPath $directory -AclObject $acl
+
+    $path = Join-Path $directory 'admin-password'
+    [System.IO.File]::WriteAllText($path, $Secret, (New-Object System.Text.UTF8Encoding($false)))
+    return $path
+}
+
+function Remove-RuntimeSecretFile {
+    param([AllowNull()][string] $Path)
+
+    if ([string]::IsNullOrEmpty($Path)) {
+        return
+    }
+    if (Test-Path -LiteralPath $Path) {
+        [System.IO.File]::WriteAllText($Path, ('0' * 512), (New-Object System.Text.UTF8Encoding($false)))
+    }
+    $directory = Split-Path -Parent $Path
+    if ((Split-Path -Leaf $directory) -notlike 'agency-vm-*') {
+        throw "Refusing to remove '$directory': not an Agency runtime secret directory."
+    }
+    Remove-Item -LiteralPath $directory -Recurse -Force -ErrorAction SilentlyContinue
+}
+
 function Invoke-AzureDevVmPlan {
     [CmdletBinding()]
     param(
@@ -454,9 +490,11 @@ function Invoke-AzureDevVmPlan {
         throw "Approval hash mismatch. Expected '$ExpectedPlanHash'; current plan is '$($Plan.planHash)'. Review the new plan before applying."
     }
 
-    $env:AGENCY_VM_BOOTSTRAP_PASSWORD = New-RuntimePassword
+    $script:RuntimeSecret = New-RuntimePassword
+    $secretFile = $null
     $completedSteps = [System.Collections.Generic.List[string]]::new()
     try {
+        $secretFile = New-RuntimeSecretFile -Secret $script:RuntimeSecret
         foreach ($command in $Plan.commands) {
             if ($command.step -eq 'Install the approved developer toolchain') {
                 $artifact = $Plan.artifacts |
@@ -471,7 +509,7 @@ function Invoke-AzureDevVmPlan {
             }
             $arguments = foreach ($argument in $command.arguments) {
                 if ($argument -eq $script:SecretPlaceholder) {
-                    $env:AGENCY_VM_BOOTSTRAP_PASSWORD
+                    "@$secretFile"
                 }
                 else {
                     $argument
@@ -486,7 +524,8 @@ function Invoke-AzureDevVmPlan {
         throw "Provisioning stopped after completed steps: $completed. Azure resources may require manual cleanup. $($_.Exception.Message)"
     }
     finally {
-        Remove-Item Env:\AGENCY_VM_BOOTSTRAP_PASSWORD -ErrorAction SilentlyContinue
+        Remove-RuntimeSecretFile -Path $secretFile
+        $script:RuntimeSecret = $null
     }
 
     return $completedSteps

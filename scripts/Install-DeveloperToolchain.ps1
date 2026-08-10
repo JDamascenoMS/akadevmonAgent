@@ -70,11 +70,25 @@ if ($workloadList.Count -eq 0) {
     throw 'At least one Visual Studio workload is required.'
 }
 
+function Assert-MicrosoftSigned {
+    param([Parameter(Mandatory)][string] $Path)
+
+    $signature = Get-AuthenticodeSignature -LiteralPath $Path
+    if ($signature.Status -ne 'Valid') {
+        throw "Refusing to run '$Path': Authenticode status is '$($signature.Status)', expected 'Valid'."
+    }
+    $subject = $signature.SignerCertificate.Subject
+    if ($subject -notmatch 'O=Microsoft Corporation') {
+        throw "Refusing to run '$Path': signer '$subject' is not Microsoft Corporation."
+    }
+}
+
 $workDirectory = Join-Path $env:ProgramData 'Agency\AzureDevVm'
 New-Item -ItemType Directory -Force -Path $workDirectory | Out-Null
 
 $dotnetInstallPath = Join-Path $workDirectory 'dotnet-install.ps1'
 Invoke-WebRequest -UseBasicParsing -Uri 'https://dot.net/v1/dotnet-install.ps1' -OutFile $dotnetInstallPath
+Assert-MicrosoftSigned -Path $dotnetInstallPath
 $sdkChannels = @{
     'Microsoft.DotNet.SDK.8' = '8.0'
     'Microsoft.DotNet.SDK.9' = '9.0'
@@ -95,6 +109,7 @@ foreach ($package in $sdkList) {
 $editionSlug = $VisualStudioEdition.ToLowerInvariant()
 $bootstrapperPath = Join-Path $workDirectory "vs_$editionSlug.exe"
 Invoke-WebRequest -UseBasicParsing -Uri "https://aka.ms/vs/17/release/vs_$editionSlug.exe" -OutFile $bootstrapperPath
+Assert-MicrosoftSigned -Path $bootstrapperPath
 $installerArguments = @('--wait', '--quiet', '--norestart')
 foreach ($workload in $workloadList) {
     $installerArguments += @('--add', $workload)

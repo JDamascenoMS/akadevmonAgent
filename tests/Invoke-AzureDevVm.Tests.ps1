@@ -126,10 +126,34 @@ Describe 'Azure development VM plan' {
         ($vmCommand.arguments -contains '--open-ports') | Should Be $false
     }
 
-    It 'redacts the generated bootstrap password' {
+    It 'keeps the generated bootstrap password out of the displayed command' {
         $vmCommand = $plan.commands | Where-Object step -eq 'Create private Windows VM'
-        $vmCommand.command | Should Match '\$env:AGENCY_VM_BOOTSTRAP_PASSWORD'
+        $vmCommand.command | Should Match '@<runtime-secret-file>'
         $vmCommand.command | Should Not Match 'A9!'
+    }
+
+    It 'never embeds a literal password in the plan arguments' {
+        $vmCommand = $plan.commands | Where-Object step -eq 'Create private Windows VM'
+        $passwordIndex = [Array]::IndexOf($vmCommand.arguments, '--admin-password')
+        ($passwordIndex -ge 0) | Should Be $true
+        $vmCommand.arguments[$passwordIndex + 1] | Should Be '__AGENCY_VM_BOOTSTRAP_PASSWORD__'
+    }
+
+    It 'writes the bootstrap password to a private file verbatim' {
+        $module = Get-Module AzureDevVm
+        $secret = 'A9!ExampleSecretValue'
+        $path = & $module { param($s) New-RuntimeSecretFile -Secret $s } $secret
+        try {
+            $bytes = [System.IO.File]::ReadAllBytes($path)
+            $bytes.Length | Should Be $secret.Length
+            [System.Text.Encoding]::UTF8.GetString($bytes) | Should Be $secret
+            $acl = Get-Acl -LiteralPath (Split-Path -Parent $path)
+            $acl.Access.Count | Should Be 1
+        }
+        finally {
+            & $module { param($p) Remove-RuntimeSecretFile -Path $p } $path
+        }
+        Test-Path -LiteralPath $path | Should Be $false
     }
 
     It 'binds apply to the reviewed plan hash before Azure execution' {
@@ -151,5 +175,43 @@ Describe 'Azure development VM plan' {
         ($installCommand.arguments -contains 'create') | Should Be $true
         ($installCommand.arguments -contains '--timeout-in-seconds') | Should Be $true
         ($installCommand.arguments -contains '14400') | Should Be $true
+    }
+}
+
+Describe 'VM-side toolchain installer' {
+    BeforeEach {
+        $installerPath = Join-Path $root 'scripts\Install-DeveloperToolchain.ps1'
+        $installer = Get-Content -LiteralPath $installerPath -Raw
+    }
+
+    It 'verifies every download before it is executed' {
+        ([regex]::Matches($installer, 'Assert-MicrosoftSigned -Path')).Count | Should Be 2
+
+        $verifyDotnet = $installer.IndexOf('Assert-MicrosoftSigned -Path $dotnetInstallPath')
+        $runDotnet = $installer.IndexOf('& $dotnetInstallPath')
+        ($verifyDotnet -gt 0) | Should Be $true
+        ($verifyDotnet -lt $runDotnet) | Should Be $true
+
+        $verifyVs = $installer.IndexOf('Assert-MicrosoftSigned -Path $bootstrapperPath')
+        $runVs = $installer.IndexOf('Start-Process -FilePath $bootstrapperPath')
+        ($verifyVs -gt 0) | Should Be $true
+        ($verifyVs -lt $runVs) | Should Be $true
+    }
+
+    It 'rejects a file that is not validly signed by Microsoft' {
+        $ast = [System.Management.Automation.Language.Parser]::ParseFile(
+            $installerPath, [ref] $null, [ref] $null
+        )
+        $definition = $ast.FindAll({
+            param($node)
+            $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+            $node.Name -eq 'Assert-MicrosoftSigned'
+        }, $true)
+        $definition.Count | Should Be 1
+
+        . ([scriptblock]::Create($definition[0].Extent.Text))
+        $unsigned = Join-Path $TestDrive 'unsigned.ps1'
+        Set-Content -LiteralPath $unsigned -Value 'Write-Output "not signed"'
+        (Test-Throws { Assert-MicrosoftSigned -Path $unsigned }) | Should Be $true
     }
 }

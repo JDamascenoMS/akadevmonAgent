@@ -51,6 +51,8 @@ Describe 'Agency plugin package' {
         $manifest.name | Should Be 'azure-dev-vm'
         ($manifest.agents -contains 'agents/azure-dev-vm.md') | Should Be $true
         Test-Path -LiteralPath (Join-Path $root $manifest.agents[0]) | Should Be $true
+        ($manifest.skills -contains 'skills/provision-azure-dev-vm') | Should Be $true
+        Test-Path -LiteralPath (Join-Path $root $manifest.skills[0]) | Should Be $true
     }
 
     It 'declares the Claude agent in the Claude plugin manifest' {
@@ -59,6 +61,8 @@ Describe 'Agency plugin package' {
         $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
         $manifest.name | Should Be 'azure-dev-vm'
         Test-Path -LiteralPath (Join-Path $root $manifest.agents[0]) | Should Be $true
+        ($manifest.skills -contains './skills/provision-azure-dev-vm') | Should Be $true
+        Test-Path -LiteralPath (Join-Path $root $manifest.skills[0]) | Should Be $true
     }
 
     It 'points both engine manifests at the same agent definition' {
@@ -73,6 +77,7 @@ Describe 'Agency plugin package' {
         $claudeAgent = (Resolve-Path -LiteralPath (Join-Path $root $claudeManifest.agents[0])).Path
         $copilotAgent = (Resolve-Path -LiteralPath (Join-Path $root $copilotManifest.agents[0])).Path
         $claudeAgent | Should Be $copilotAgent
+        $claudeManifest.skills[0].TrimStart('./') | Should Be $copilotManifest.skills[0]
     }
 
     It 'contributes the plugin through the marketplace catalog' {
@@ -82,6 +87,10 @@ Describe 'Agency plugin package' {
         $catalog.name | Should Be 'azure-dev-vm-marketplace'
         $catalog.plugins[0].name | Should Be 'azure-dev-vm'
         $catalog.plugins[0].source | Should Be './'
+        $pluginManifest = Get-Content -LiteralPath (
+            Join-Path $root '.github\plugin\plugin.json'
+        ) -Raw | ConvertFrom-Json
+        $catalog.plugins[0].version | Should Be $pluginManifest.version
     }
 
     It 'resolves bundled scripts through the plugin root' {
@@ -97,6 +106,22 @@ Describe 'Agency plugin package' {
             Join-Path $root 'agents\azure-dev-vm.md'
         ) -Raw
         $pluginAgent.Replace("`r`n", "`n") | Should Be $repositoryAgent.Replace("`r`n", "`n")
+    }
+
+    It 'declares Agency marketplace compatibility' {
+        $agency = Get-Content -LiteralPath (Join-Path $root 'agency.json') -Raw |
+            ConvertFrom-Json
+        ($agency.engines -contains 'copilot') | Should Be $true
+        ($agency.platforms -contains 'windows') | Should Be $true
+        $agency.category | Should Be 'developer-tools'
+    }
+
+    It 'loads bundled provisioning code only from the plugin root' {
+        $skillPath = Join-Path $root 'skills\provision-azure-dev-vm\SKILL.md'
+        $skill = Get-Content -LiteralPath $skillPath -Raw
+        $skill | Should Match '(?m)^name: provision-azure-dev-vm\r?$'
+        $skill | Should Match 'COPILOT_PLUGIN_ROOT'
+        $skill | Should Not Match '(?m)-File scripts[\\/]'
     }
 }
 

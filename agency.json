@@ -1,0 +1,16 @@
+{
+  "$schema": "https://github.com/agency-microsoft/.github-private/agency.schema.json",
+  "engines": [
+    "copilot"
+  ],
+  "platforms": [
+    "windows"
+  ],
+  "category": "developer-tools",
+  "authors": [
+    {
+      "name": "Julio Damasceno",
+      "email": "v-jdamasceno@microsoft.com"
+    }
+  ]
+}

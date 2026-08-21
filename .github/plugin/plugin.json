@@ -1,7 +1,7 @@
 {
   "name": "azure-dev-vm",
-  "description": "Safely plans and provisions private Azure Windows development VMs with Microsoft Entra sign-in and approved developer tools.",
-  "version": "1.0.0",
+  "description": "Contains an agent and skill for safely planning and provisioning private Azure Windows development VMs.",
+  "version": "1.1.0",
   "author": {
     "name": "JDamascenoMS"
   },
@@ -14,5 +14,8 @@
   ],
   "agents": [
     "agents/azure-dev-vm.md"
+  ],
+  "skills": [
+    "skills/provision-azure-dev-vm"
   ]
 }

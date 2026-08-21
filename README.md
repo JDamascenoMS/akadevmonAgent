@@ -1,8 +1,15 @@
-# Agency Azure Development VM Agent
+# Agency Azure Development VM Agent and Skill
 
-This repository contains an Agency-compatible GitHub Copilot agent that plans and provisions a private Azure Windows development VM. It installs selected .NET SDKs and Visual Studio 2022 workloads, enables Microsoft Entra sign-in, assigns VM-scoped login roles, and configures auto-shutdown.
+This repository contains an Agency-compatible GitHub Copilot agent and Marketplace skill that plan and provision a private Azure Windows development VM. They install selected .NET SDKs and Visual Studio 2022 workloads, enable Microsoft Entra sign-in, assign VM-scoped login roles, and configure auto-shutdown.
 
 It can run directly as a repository agent or be installed as an Agency/Copilot plugin.
+
+## Included capabilities
+
+| Capability | Purpose |
+|---|---|
+| `azure-dev-vm` agent | Repository or plugin agent that owns the complete plan, approval, apply, and reporting workflow. |
+| `provision-azure-dev-vm` skill | Marketplace skill that adds the same guarded Azure VM workflow to a normal Agency Copilot session. |
 
 ## Safety model
 
@@ -51,6 +58,23 @@ Ask the agent to provision the VM described by `.agency/azure-dev-vm.json`. It w
 
 The existing GitHub MCP server may remain enabled. It is not used for Azure provisioning, and no additional MCP server is required.
 
+## Run as a Marketplace skill
+
+Install or load the plugin, then start a normal Agency Copilot session:
+
+```powershell
+agency copilot --plugin local:C:\path\to\agent-devtests
+```
+
+Ask:
+
+> Use the provision-azure-dev-vm skill to plan the VM in
+> `.agency/azure-dev-vm.json`. Do not apply it yet.
+
+The skill resolves the trusted provisioner from `COPILOT_PLUGIN_ROOT`; it never
+executes an identically named script from the consumer repository. It requests
+approval for the exact generated plan hash before apply mode.
+
 ## Test as a local plugin
 
 From a separate Git repository containing `.agency/azure-dev-vm.json`, load this checkout as a plugin:
@@ -71,6 +95,8 @@ This repository includes:
 - `.claude-plugin/plugin.json`, the Claude plugin manifest. Copilot accepts any one of the manifests, but the Claude engine requires this specific file, and both `agency plugin install` and `agency marketplace add` target every engine unless `--engine` is passed.
 - `.claude-plugin/marketplace.json`, a catalog contributing the plugin.
 - `agents/azure-dev-vm.md`, the plugin agent definition. It is intentionally kept identical to the repository-agent definition under `.github/agents`.
+- `skills/provision-azure-dev-vm/SKILL.md`, the Marketplace skill definition.
+- `agency.json`, the Agency catalog metadata used when contributing the plugin to the playground or curated marketplace.
 
 Agency acquires GitHub-hosted plugins through the GitHub CLI, not through Git's credential helper. Install and authenticate `gh` first, otherwise installation fails with `No GitHub accounts found`:
 
